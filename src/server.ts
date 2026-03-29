@@ -22,28 +22,31 @@ Bun.serve({
             const serviceName = db.getService(repo, token);
             if (!serviceName) return new Response('invalid token', { status: 403 });
 
-            const servicePath = path.join(systemFilesDir, serviceName + '.service');
-            if (!fs.existsSync(servicePath)) {
-                console.error('[service not found]', serviceName);
-                return new Response('service not found', { status: 404 });
+            const event = req.headers.get('X-Github-Event');
+            if (event === 'push') {
+                const servicePath = path.join(systemFilesDir, serviceName + '.service');
+                if (!fs.existsSync(servicePath)) {
+                    console.error('[service not found]', serviceName);
+                    return new Response('service not found', { status: 404 });
+                }
+
+                const serviceContents = fs.readFileSync(servicePath, 'utf-8');
+                const workingDirectory = serviceContents.split('\n').find(line => line.startsWith('WorkingDirectory='))?.split('=')[1].trim();
+                if (!workingDirectory) {
+                    console.error('[working directory not found in service file]', serviceName);
+                    return new Response('working directory not found in service file', { status: 500 });
+                }
+
+                console.log(`[pulling changes] ${repo} --> ${serviceName}`);
+
+                execSync('git pull', { cwd: workingDirectory, stdio: 'inherit' });
+                execSync('systemctl restart ' + serviceName, { stdio: 'inherit' });
             }
-
-            const serviceContents = fs.readFileSync(servicePath, 'utf-8');
-            const workingDirectory = serviceContents.split('\n').find(line => line.startsWith('WorkingDirectory='))?.split('=')[1].trim();
-            if (!workingDirectory) {
-                console.error('[working directory not found in service file]', serviceName);
-                return new Response('working directory not found in service file', { status: 500 });
-            }
-
-            console.log(`[pulling changes] ${repo} --> ${serviceName}`);
-
-            execSync('git pull', { cwd: workingDirectory, stdio: 'inherit' });
-            execSync('systemctl restart ' + serviceName, { stdio: 'inherit' });
 
             if (Bun.env.WEBHOOK) await fetch(Bun.env.WEBHOOK, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: `:+1: **${repo}** pulled` })
+                body: JSON.stringify({ content: `:+1: **${repo}** (${serviceName}) --> \`${event}\`` })
             });
 
             return new Response('OK');
