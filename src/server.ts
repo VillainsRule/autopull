@@ -8,7 +8,7 @@ const systemFilesDir = path.join('/', 'etc', 'systemd', 'system');
 
 Bun.serve({
     port: 4479,
-    fetch(req) {
+    async fetch(req) {
         const url = new URL(req.url);
 
         if (url.pathname === '/') return new Response('OK');
@@ -39,6 +39,12 @@ Bun.serve({
 
             execSync('git pull', { cwd: workingDirectory, stdio: 'inherit' });
             execSync('systemctl restart ' + serviceName, { stdio: 'inherit' });
+
+            if (Bun.env.WEBHOOK) await fetch(Bun.env.WEBHOOK, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: `:+1: **${repo}** pulled` })
+            });
 
             return new Response('OK');
         }

@@ -15,7 +15,13 @@
 if you want to build ap yourself (builds on mac/linux only):
 1. install [bun](https://bun.sh)
 2. clone the repo: `git clone https://github.com/VillainsRule/autopull && cd autopull`
-3. build autopull: `./build.sh`
+3. create an env: `cp .env.example .env`
+    - `HOST` is mandatory; you need to port forward it
+    - `WEBHOOK` is optional; if set, it will send a message to the DC webhook every time a repo is updated
+4. build autopull: `./build.sh`
+
+> [!NOTE]
+> env vars get embedded, you will need to rebuild to update them
 
 <br><br>
 <h5 align='center'>made with :heart:</h5>
